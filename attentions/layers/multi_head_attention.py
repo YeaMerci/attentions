@@ -76,16 +76,27 @@ class MultiHeadAttention(nn.Module):
         but also computationally less expensive than having 3 separate weight matrices for each head.
 
     Example:
-        >>> # Forward Q, K, V tensors as defferent inputs (self-attention mechanism not used)
-        >>> multihead_attention = MultiHeadAttention(num_heads=8, kdim=480, vdim=480, embed_dim=512, dropout=0.2)
+        >>> # In this example I want show you cases
+        >>> # where we can use different attention types
+        >>> # but is not necessary defined attention type because it's just for computing optimization
+        >>>
+        >>> # Forward Q, K, V tensors as defferent inputs
+        >>> multihead_attention = MultiHeadAttention(num_heads=15, embed_dim=512, kdim=300, vdim=480)
         >>> queries = torch.randn((32, 10, 512))  # Batch size of 32, sequence length of 10
-        >>> keys = values = torch.randn((32, 10, 480))
+        >>> keys = torch.randn((32, 10, 300))
+        >>> values = torch.randn((32, 10, 480))
         >>> output_data = multihead_attention(queries, keys, values)
         >>>
-        >>> # Forward Q, K, V tensors as same inputs (self-attention mechanism is used)
-        >>> multihead_attention = MultiHeadAttention(num_heads=8, embed_dim=512, dropout=0.2, attention_type="self-attention")
-        >>> features = torch.randn((32, 10, 512))
-        >>> output_data = multihead_attention(features, features, features)
+        >>> # Self-attention | Q, K, V tensors is same inputs
+        >>> multihead_attention = MultiHeadAttention(num_heads=15, embed_dim=512, attention_type="self-attention")
+        >>> queries = keys = values = torch.randn((32, 10, 512))
+        >>> output_data = multihead_attention(queries, keys, values)
+        >>>
+        >>> # Cross-attention | K and V tensors as same inputs
+        >>> multihead_attention = MultiHeadAttention(num_heads=8, embed_dim=512, kdim=300, vdim=300, attention_type="cross-attention")
+        >>> queries = torch.randn((32, 10, 512))
+        >>> keys = values = torch.randn((32, 10, 300))
+        >>> output_data = multihead_attention(queries, keys, values)
     """
 
     def __init__(self,
