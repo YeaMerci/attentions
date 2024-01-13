@@ -1,6 +1,2 @@
-def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()
+from .attend_linear import AttendLinear
+from .mha import MultiHeadAttention
