@@ -1,4 +1,9 @@
-class AttendLinear(Module):
+from typing import Optional
+import torch
+from torch import nn
+
+
+class AttendLinear(nn.Module):
     """
     Attention mechanism for sequence data.
 
