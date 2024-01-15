@@ -1,10 +1,12 @@
 """
-Docs
+This module have implementations of transformer Decoder and Encoder layers.
+This both types are used for building transformer encoders and decoders
+but can be used for building any models (BERT, GPT and others).
 """
 
 __all__ = ["TransformerEncoderLayer", "TransformerDecoderLayer"]
 
-from typing import Literal
+from typing import Literal, Optional
 import torch
 from torch import nn
 from .mha import MultiHeadAttention
