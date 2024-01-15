@@ -3,10 +3,21 @@ This module implements tranformer encoder and decoder architectures.
 Also implements fully transformer model which contains of encoder and decoder.
 """
 
-__all__ = ["TransformerEncoder", "TransformerDecoder", "Transformer"]
+__all__ = [
+    "TransformerEncoder",
+    "TransformerDecoder",
+    "Transformer"
+]
 
 
-class TransformerEncoder(nn.Module):
+from typing import Union, Optional, Callable, Any
+from torch import Tensor
+from torch.nn import Module, ModuleList
+from torch.nn import LayerNorm, ReLU
+from layers import TransformerEncoderLayer, TransformerDecoderLayer
+
+
+class TransformerEncoder(Module):
     """
     Transformer encoder composed of multiple layers of TransformerEncoderLayer.
 
@@ -26,16 +37,21 @@ class TransformerEncoder(nn.Module):
         - Output: (batch_size, sequence_length, d_model)
 
     Example:
-        >>> encoder_layer = TransformerEncoderLayer(d_model=512, num_heads=8, dropout=0.2)
-        >>> transformer_encoder = TransformerEncoder(encoder_layer, num_layers=6, norm=nn.LayerNorm(512))
+        >>> # test case imports
+        >>> import torch
+        >>> from torch.nn import LayerNorm
+        >>> from attentions import TransformerEncoderLayer, TransformerEncoder
+        >>>
         >>> input_data = torch.randn((32, 10, 512))  # Batch size of 32, sequence length of 10
+        >>> encoder_layer = TransformerEncoderLayer(d_model=512, num_heads=8, dropout=0.2)
+        >>> transformer_encoder = TransformerEncoder(encoder_layer, num_layers=6, norm=LayerNorm(512))
         >>> output_data = transformer_encoder(input_data)
     """
 
     def __init__(self,
                  encoder_layer: TransformerEncoderLayer,
                  num_layers: int,
-                 norm: nn.LayerNorm | nn.BatchNorm1d | Any
+                 norm: LayerNorm | Any
                  ):
         super().__init__()
         self.num_layers = num_layers
@@ -43,7 +59,7 @@ class TransformerEncoder(nn.Module):
         self.norm = norm
 
     @staticmethod
-    def _build_encoder(num_layers: Optional[int], layer: nn.Module) -> nn.ModuleList:
+    def _build_encoder(num_layers: int, layer: TransformerEncoderLayer) -> ModuleList:
         """
         Helper method to build a list of encoder layers.
 
@@ -54,19 +70,22 @@ class TransformerEncoder(nn.Module):
         Returns:
             nn.ModuleList: List of TransformerEncoderLayer instances.
         """
-        return nn.ModuleList([
+        return ModuleList([
             deepcopy(layer)
             for _ in range(num_layers)
         ])
 
-    def forward(self, source: torch.Tensor, source_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self,
+                source: Tensor,
+                source_mask: Optional[Tensor] = None
+                ) -> Tensor:
         """
         Forward pass of the Transformer encoder.
 
         Args:
             source (torch.Tensor): Input tensor of shape (batch_size, sequence_length, d_model).
             source_mask (Optional[torch.Tensor]): Mask tensor for masking attention scores.
-                It should be of shape (batch_size, 1, sequence_length) and contain 0s in positions
+                It should be of shape (batch_size, sequence_length, sequence_length) and contain 0s in positions
                 where attention should be masked.
 
         Returns:
@@ -79,7 +98,7 @@ class TransformerEncoder(nn.Module):
         return source
 
 
-class TransformerDecoder(nn.Module):
+class TransformerDecoder(Module):
     """
     Transformer decoder composed of multiple layers of TransformerDecoderLayer.
 
@@ -98,13 +117,18 @@ class TransformerDecoder(nn.Module):
         - Input:
             - target: (batch_size, target_sequence_length, d_model)
             - memory: (batch_size, source_sequence_length, d_model)
-            - target_mask: (batch_size, 1, target_sequence_length)
-            - memory_mask: (batch_size, 1, source_sequence_length)
+            - target_mask: (batch_size, target_sequence_length, target_sequence_length)
+            - memory_mask: (batch_size, source_sequence_length, source_sequence_length)
         - Output: (batch_size, target_sequence_length, d_model)
 
     Example:
+        >>> # test case imports
+        >>> import torch
+        >>> from torch.nn import LayerNorm
+        >>> from attentions import TransformerDecoderLayer, TransformerDecoder
+        >>>
         >>> decoder_layer = TransformerDecoderLayer(d_model=512, num_heads=8, dropout=0.2)
-        >>> transformer_decoder = TransformerDecoder(decoder_layer, num_layers=6, norm=nn.LayerNorm(512))
+        >>> transformer_decoder = TransformerDecoder(decoder_layer, num_layers=6, norm=LayerNorm(512))
         >>> target_data = torch.randn((32, 10, 512))  # Batch size of 32, sequence length of 10
         >>> memory_data = torch.randn((32, 15, 512))  # Batch size of 32, sequence length of 15
         >>> output_data = transformer_decoder(target_data, memory_data)
@@ -113,7 +137,7 @@ class TransformerDecoder(nn.Module):
     def __init__(self,
                  decoder_layer: TransformerDecoderLayer,
                  num_layers: int,
-                 norm: nn.LayerNorm | nn.BatchNorm1d | Any
+                 norm: LayerNorm | Any
                  ):
         super().__init__()
         self.num_layers = num_layers
@@ -121,7 +145,7 @@ class TransformerDecoder(nn.Module):
         self.norm = norm
 
     @staticmethod
-    def _build_decoder(num_layers: Optional[int], layer: nn.Module) -> nn.ModuleList:
+    def _build_decoder(num_layers: int, layer: TransformerDecoderLayer) -> ModuleList:
         """
         Helper method to build a list of decoder layers.
 
@@ -130,19 +154,19 @@ class TransformerDecoder(nn.Module):
             layer (nn.Module): Instance of the TransformerDecoderLayer.
 
         Returns:
-            nn.ModuleList: List of TransformerDecoderLayer instances.
+            ModuleList: List of TransformerDecoderLayer instances.
         """
-        return nn.ModuleList([
+        return ModuleList([
             deepcopy(layer)
             for _ in range(num_layers)
         ])
 
     def forward(self,
-                target: torch.Tensor,
-                memory: torch.Tensor,
-                target_mask: Optional[torch.Tensor] = None,
-                memory_mask: Optional[torch.Tensor] = None
-                ) -> torch.Tensor:
+                target: Tensor,
+                memory: Tensor,
+                target_mask: Optional[Tensor] = None,
+                memory_mask: Optional[Tensor] = None
+                ) -> Tensor:
         """
         Forward pass of the Transformer decoder.
 
@@ -150,10 +174,10 @@ class TransformerDecoder(nn.Module):
             target (torch.Tensor): Input tensor (target sequence) of shape (batch_size, target_sequence_length, d_model).
             memory (torch.Tensor): Memory tensor (encoder output) of shape (batch_size, source_sequence_length, d_model).
             target_mask (Optional[torch.Tensor]): Mask tensor for masking attention scores on the target sequence.
-                It should be of shape (batch_size, 1, target_sequence_length) and contain 0s in positions
+                It should be of shape (batch_size, target_sequence_length, target_sequence_length) and contain 0s in positions
                 where attention should be masked.
             memory_mask (Optional[torch.Tensor]): Mask tensor for masking attention scores on the memory.
-                It should be of shape (batch_size, 1, source_sequence_length) and contain 0s in positions
+                It should be of shape (batch_size, target_sequence_length, source_sequence_length) and contain 0s in positions
                 where attention should be masked.
 
         Returns:
@@ -167,7 +191,7 @@ class TransformerDecoder(nn.Module):
         return output
 
 
-class Transformer(nn.Module):
+class Transformer(Module):
     """
     Transformer model composed of a TransformerEncoder and a TransformerDecoder.
 
@@ -200,12 +224,16 @@ class Transformer(nn.Module):
         - Input:
             - source: (batch_size, source_sequence_length, d_model)
             - target: (batch_size, target_sequence_length, d_model)
-            - source_mask: (batch_size, 1, source_sequence_length)
-            - target_mask: (batch_size, 1, target_sequence_length)
-            - memory_mask: (batch_size, 1, source_sequence_length)
+            - source_mask: (batch_size, source_sequence_length, source_sequence_length)
+            - target_mask: (batch_size, target_sequence_length, target_sequence_length)
+            - memory_mask: (batch_size, target_sequence_length, source_sequence_length)
         - Output: (batch_size, target_sequence_length, d_model)
 
     Example:
+        >>> # test case imports
+        >>> import torch
+        >>> from attentions import Transformer
+        >>>
         >>> transformer_model = Transformer(d_model=512, num_heads=8, num_encoder_layers=6, num_decoder_layers=6)
         >>> source_data = torch.randn((32, 20, 512))  # Batch size of 32, source sequence length of 20
         >>> target_data = torch.randn((32, 15, 512))  # Batch size of 32, target sequence length of 15
@@ -219,7 +247,7 @@ class Transformer(nn.Module):
                  num_decoder_layers: Optional[int] = 6,
                  dim_feedforward: Optional[int] = 2048,
                  dropout: Optional[float] = 0.1,
-                 activation: Union[str, Callable[[Tensor], Tensor]] = nn.ReLU,
+                 activation: Union[str, Callable[[Tensor], Tensor]] = ReLU,
                  custom_encoder: Optional[Any] = None,
                  custom_decoder: Optional[Any] = None,
                  pre_layer_norm: Optional[bool] = False,
@@ -241,7 +269,7 @@ class Transformer(nn.Module):
                 dropout, activation,
                 pre_layer_norm, bias
             )
-            encoder_norm = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
+            encoder_norm = LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
             self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, encoder_norm)
 
         # create custom decoder if it was provided
@@ -255,7 +283,7 @@ class Transformer(nn.Module):
                 dropout, activation,
                 pre_layer_norm, bias
             )
-            decoder_norm = nn.LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
+            decoder_norm = LayerNorm(d_model, eps=layer_norm_eps, bias=bias)
             self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, decoder_norm)
 
         self._reset_parameters()
@@ -280,13 +308,13 @@ class Transformer(nn.Module):
             source (Tensor): Input tensor (source sequence) of shape (batch_size, source_sequence_length, d_model).
             target (Tensor): Input tensor (target sequence) of shape (batch_size, target_sequence_length, d_model).
             source_mask (Optional[Tensor]): Mask tensor for masking attention scores on the source sequence.
-                It should be of shape (batch_size, 1, source_sequence_length) and contain 0s in positions
+                It should be of shape (batch_size, source_sequence_length, source_sequence_length) and contain 0s in positions
                 where attention should be masked.
             target_mask (Optional[Tensor]): Mask tensor for masking attention scores on the target sequence.
-                It should be of shape (batch_size, 1, target_sequence_length) and contain 0s in positions
+                It should be of shape (batch_size, target_sequence_length, target_sequence_length) and contain 0s in positions
                 where attention should be masked.
             memory_mask (Optional[Tensor]): Mask tensor for masking attention scores on the memory.
-                It should be of shape (batch_size, 1, source_sequence_length) and contain 0s in positions
+                It should be of shape (batch_size, target_sequence_length, source_sequence_length) and contain 0s in positions
                 where attention should be masked.
 
         Returns:
