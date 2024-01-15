@@ -1,3 +1,11 @@
+"""
+This module have implementations of any Linear layer modifications.
+Core of any linear layer modification is attention mechanism.
+Any interesting and crazy modifications can be added to this module in any time.
+"""
+
+__all__ = ["AttendLinear"]
+
 from typing import Optional
 import torch
 from torch import nn

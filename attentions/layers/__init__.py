@@ -1,2 +1,2 @@
-from .attend_linear import AttendLinear
-from .mha import MultiHeadAttention
+from .attend_linear import *
+from .mha import *
