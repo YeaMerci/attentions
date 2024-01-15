@@ -354,7 +354,7 @@ class MultiHeadAttention(nn.Module):
         #   [batch_size, num_heads, sequence_length, dims]
         linear_projection = linear_projection.permute(0, 2, 1, 3)
         if (embed_dim // self.num_heads) == self.head_dim:
-            # Q, K or V linear projections
+            # Q, K or V linear projection
             return linear_projection  # return linear_projection: [batch_size, num_heads, sequence_length, head_dim]
         elif (embed_dim // self.num_heads) == self.head_dim * 2:
             # K and V  linear projections
