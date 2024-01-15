@@ -1,5 +1,6 @@
 """
-Docs
+This module implements tranformer encoder and decoder architectures.
+Also implements fully transformer model which contains of encoder and decoder.
 """
 
 __all__ = ["TransformerEncoder", "TransformerDecoder", "Transformer"]
