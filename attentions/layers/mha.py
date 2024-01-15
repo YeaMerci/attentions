@@ -1,3 +1,12 @@
+"""
+This module contain implementation of universal multi-head attention.
+It can be used for building any models or layers because this implementation
+can be optionally masked.
+This also optimized for (GPGPU) cuda computing as well as I could do it.
+"""
+
+__all__ = ["MultiHeadAttention"]
+
 from typing import Optional, Literal
 import math
 import torch.nn.functional as F
