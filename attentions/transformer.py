@@ -11,10 +11,13 @@ __all__ = [
 
 
 from typing import Union, Optional, Callable, Any
+from copy import deepcopy
+
 from torch import Tensor
+from torch.nn.init import xavier_uniform_
 from torch.nn import Module, ModuleList
 from torch.nn import LayerNorm, ReLU
-from layers import TransformerEncoderLayer, TransformerDecoderLayer
+from attentions.layers.transformer import TransformerEncoderLayer, TransformerDecoderLayer
 
 
 class TransformerEncoder(Module):
@@ -51,7 +54,7 @@ class TransformerEncoder(Module):
     def __init__(self,
                  encoder_layer: TransformerEncoderLayer,
                  num_layers: int,
-                 norm: LayerNorm | Any
+                 norm: Optional[LayerNorm | Any] = None
                  ):
         super().__init__()
         self.num_layers = num_layers
@@ -137,7 +140,7 @@ class TransformerDecoder(Module):
     def __init__(self,
                  decoder_layer: TransformerDecoderLayer,
                  num_layers: int,
-                 norm: LayerNorm | Any
+                 norm: Optional[LayerNorm | Any] = None
                  ):
         super().__init__()
         self.num_layers = num_layers

@@ -4,15 +4,19 @@ This both types are used for building transformer encoders and decoders
 but can be used for building any models (BERT, GPT and others).
 """
 
-__all__ = ["TransformerEncoderLayer", "TransformerDecoderLayer"]
+__all__ = [
+    "TransformerEncoderLayer",
+    "TransformerDecoderLayer"
+]
 
-from typing import Literal, Optional
-import torch
-from torch import nn
-from .mha import MultiHeadAttention
+from typing import Union, Optional, Callable
+from torch import Tensor
+from torch.nn import Module, Sequential
+from torch.nn import Linear, LayerNorm, ReLU, Dropout
+from attentions.layers.mha import MultiHeadAttention
 
 
-class TransformerEncoderLayer(nn.Module):
+class TransformerEncoderLayer(Module):
     """
     Transformer encoder layer with multi-head self-attention and feedforward block.
 
@@ -57,7 +61,7 @@ class TransformerEncoderLayer(nn.Module):
                  num_heads: int,
                  dim_feedforward: Optional[int] = None,
                  dropout: Optional[float] = 0.1,
-                 activation: Optional[nn.Module] = nn.ReLU,
+                 activation: Union[str, Callable[[Tensor], Tensor]] = ReLU,
                  pre_layer_norm: Optional[bool] = True,
                  bias: Optional[bool] = True
                  ):
@@ -72,27 +76,27 @@ class TransformerEncoderLayer(nn.Module):
             attention_type="self-attention",
             bias=bias, dropout=dropout
         )
-        self.sa_dropout = nn.Dropout(dropout)
+        self.sa_dropout = Dropout(dropout)
 
         # norm layers & config
         self._pre_layer_norm = pre_layer_norm
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
+        self.norm1 = LayerNorm(d_model)
+        self.norm2 = LayerNorm(d_model)
 
         # feed forward or K, V memory
-        self.feedforward = nn.Sequential(
-            nn.Linear(d_model, self.dim_feedforward, bias=bias),
+        self.feedforward = Sequential(
+            Linear(d_model, self.dim_feedforward, bias=bias),
             activation(),
-            nn.Dropout(dropout),
-            nn.Linear(self.dim_feedforward, self.d_model, bias=bias),
-            nn.Dropout(dropout)
+            Dropout(dropout),
+            Linear(self.dim_feedforward, self.d_model, bias=bias),
+            Dropout(dropout)
         )
 
-    def _sa_forward(self, source: torch.Tensor, source_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def _sa_forward(self, source: Tensor, source_mask: Optional[Tensor] = None) -> Tensor:
         source = self.sa_block(source, source, source, source_mask)
         return self.sa_dropout(source)
 
-    def forward(self, source: torch.Tensor, source_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self, source: Tensor, source_mask: Optional[Tensor] = None) -> Tensor:
         """
         Forward pass of the Transformer encoder layer.
 
@@ -114,7 +118,7 @@ class TransformerEncoderLayer(nn.Module):
         return source
 
 
-class TransformerDecoderLayer(nn.Module):
+class TransformerDecoderLayer(Module):
     """
     Transformer decoder layer with multi-head self-attention and cross-attention blocks.
 
@@ -168,7 +172,7 @@ class TransformerDecoderLayer(nn.Module):
                  num_heads: int,
                  dim_feedforward: Optional[int] = None,
                  dropout: Optional[float] = 0.1,
-                 activation: Optional[nn.Module] = nn.ReLU,
+                 activation: Union[str, Callable[[Tensor], Tensor]] = ReLU,
                  pre_layer_norm: Optional[bool] = True,
                  bias: Optional[bool] = True
                  ):
@@ -185,7 +189,7 @@ class TransformerDecoderLayer(nn.Module):
             attention_type="self-attention",
             bias=bias, dropout=dropout
         )
-        self.sa_dropout = nn.Dropout(dropout)
+        self.sa_dropout = Dropout(dropout)
 
         # multi-head cross-attention block (encoder-decoder; on encoder output):
         # K is V and is encoder output called memory
@@ -196,24 +200,24 @@ class TransformerDecoderLayer(nn.Module):
             attention_type="cross-attention",
             bias=bias, dropout=dropout
         )
-        self.cross_dropout = nn.Dropout(dropout)
+        self.cross_dropout = Dropout(dropout)
 
         # norm layers & config
         self._pre_layer_norm = pre_layer_norm
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-        self.norm3 = nn.LayerNorm(d_model)
+        self.norm1 = LayerNorm(d_model)
+        self.norm2 = LayerNorm(d_model)
+        self.norm3 = LayerNorm(d_model)
 
         # feed forward or K, V memory
-        self.feedforward = nn.Sequential(
-            nn.Linear(d_model, self.dim_feedforward, bias=bias),
+        self.feedforward = Sequential(
+            Linear(d_model, self.dim_feedforward, bias=bias),
             activation(),
-            nn.Dropout(dropout),
-            nn.Linear(self.dim_feedforward, self.d_model, bias=bias),
-            nn.Dropout(dropout)
+            Dropout(dropout),
+            Linear(self.dim_feedforward, self.d_model, bias=bias),
+            Dropout(dropout)
         )
 
-    def _sa_forward(self, target: torch.Tensor, target_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def _sa_forward(self, target: Tensor, target_mask: Optional[Tensor] = None) -> Tensor:
         """
         Forward pass of the multi-head self-attention block.
 
@@ -230,10 +234,10 @@ class TransformerDecoderLayer(nn.Module):
         return self.sa_dropout(target)
 
     def _cross_forward(self,
-                       queries: torch.Tensor,
-                       memory: torch.Tensor,
-                       memory_mask: Optional[torch.Tensor] = None
-                       ) -> torch.Tensor:
+                       queries: Tensor,
+                       memory: Tensor,
+                       memory_mask: Optional[Tensor] = None
+                       ) -> Tensor:
         """
         Forward pass of the multi-head cross-attention block.
 
@@ -251,11 +255,11 @@ class TransformerDecoderLayer(nn.Module):
         return self.cross_dropout(x)
 
     def forward(self,
-                target: torch.Tensor,
-                memory: torch.Tensor,
-                target_mask: Optional[torch.Tensor] = None,
-                memory_mask: Optional[torch.Tensor] = None
-                ) -> torch.Tensor:
+                target: Tensor,
+                memory: Tensor,
+                target_mask: Optional[Tensor] = None,
+                memory_mask: Optional[Tensor] = None
+                ) -> Tensor:
         """
         Forward pass of the Transformer decoder layer.
 
@@ -282,6 +286,3 @@ class TransformerDecoderLayer(nn.Module):
             x = self.norm2(x + self._cross_forward(x, memory, memory_mask))
             x = self.norm3(x + self.feedforward(x))
         return x
-
-
-

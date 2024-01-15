@@ -7,11 +7,18 @@ Any interesting and crazy modifications can be added to this module in any time.
 __all__ = ["AttendLinear"]
 
 from typing import Optional
-import torch
-from torch import nn
+from torch import Tensor
+from torch.nn.init import xavier_uniform_
+from torch.nn import Module, Sequential
+from torch.nn import (
+    Linear,
+    LayerNorm,
+    Dropout,
+    Softmax
+)
 
 
-class AttendLinear(nn.Module):
+class AttendLinear(Module):
     """
     Attention mechanism for sequence data.
 
@@ -55,13 +62,13 @@ class AttendLinear(nn.Module):
         self.bias = bias
         self.attend_bias = attend_bias
         self.features_dim = out_features if out_features else in_features
-        self.values = nn.Linear(in_features, self.features_dim, bias=bias)
-        self.layer_norm = nn.LayerNorm(in_features)
+        self.values = Linear(in_features, self.features_dim, bias=bias)
+        self.layer_norm = LayerNorm(in_features)
 
-        self.attention = nn.Sequential(
-            nn.Linear(in_features, self.features_dim, bias=attend_bias),
-            nn.Softmax(-1),
-            nn.Dropout(dropout)
+        self.attention = Sequential(
+            Linear(in_features, self.features_dim, bias=attend_bias),
+            Softmax(-1),
+            Dropout(dropout)
         )
 
     def _reset_parameters(self) -> None:
@@ -72,18 +79,20 @@ class AttendLinear(nn.Module):
         """
 
         # initializes weights of input projection
-        nn.init.xavier_uniform_(self.values.weight)
+        xavier_uniform_(self.values.weight)
+        xavier_uniform_(self.layer_norm.weight)
         if self.bias:
             self.values.bias.data.fill_(0.)
+            self.layer_norm.weight.fill_(0.)
 
         # initializes attention weights
         for block in self.attention.children():
             if isinstance(block, nn.Linear):
-                nn.init.xavier_uniform_(block.weight)
+                xavier_uniform_(block.weight)
                 if self.attend_bias:
                     self.attention.bias.data.fill_(0.)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         """
         Forward pass of the attention mechanism.
 

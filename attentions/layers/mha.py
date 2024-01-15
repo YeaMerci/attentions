@@ -9,12 +9,14 @@ __all__ = ["MultiHeadAttention"]
 
 from typing import Optional, Literal
 import math
-import torch.nn.functional as F
-from torch import nn
 import torch
+from torch import Tensor
+from torch.nn.init import xavier_uniform_
+from torch.nn import functional as F
+from torch.nn import Module, Linear, Dropout
 
 
-class MultiHeadAttention(nn.Module):
+class MultiHeadAttention(Module):
     r"""
     Multi-head attention mechanism for sequence data.
 
@@ -135,7 +137,7 @@ class MultiHeadAttention(nn.Module):
         self.bias = bias
         self.bias_kv = bias_kv
         self.attention_type = attention_type
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = Dropout(dropout)
 
         # model dimensions, including: queries, keys, values and dimensions per attention heads
         self.embed_dim = embed_dim
@@ -149,27 +151,27 @@ class MultiHeadAttention(nn.Module):
             # if attention_type set 'self-attention' and all model dimensions equals 
             # for best optimization of computing (see implementation notes) 
             assert self.kdim == self.vdim == self.embed_dim, "kdim, vdim and embed_dim must be equals, if self-attention used"
-            self.qkv_projection = nn.Linear(embed_dim, 3 * embed_dim, bias=bias)
+            self.qkv_projection = Linear(embed_dim, 3 * embed_dim, bias=bias)
             self.kv_projection = self.queries_projection = self.keys_projection = self.values_projection = None
         else:
-            self.queries_projection = nn.Linear(embed_dim, embed_dim, bias=bias)
+            self.queries_projection = Linear(embed_dim, embed_dim, bias=bias)
             self.qkv_projection = None
 
             # cross-attention - (where K is V) initializes 2 weights matrices (Wq, Wkv)  
             if self.attention_type == "cross-attention":
                 assert self.kdim == self.vdim, "kdim must be equal vdim if cross-attention used"
-                self.kv_projection = nn.Linear(self.kdim, embed_dim * 2, bias=bias_kv)
+                self.kv_projection = Linear(self.kdim, embed_dim * 2, bias=bias_kv)
 
             # standard attention - (Q is not K and K is not V) 
             # where Q, K and V it's different input sequences with different dimensions
             else:
                 # or initilizes three weights matrices Wq, Wk and Wv 
                 # if self-attention or cross-attention mechanism is not used    
-                self.keys_projection = nn.Linear(self.kdim, embed_dim, bias=bias_kv)
-                self.values_projection = nn.Linear(self.vdim, embed_dim, bias=bias_kv)
+                self.keys_projection = Linear(self.kdim, embed_dim, bias=bias_kv)
+                self.values_projection = Linear(self.vdim, embed_dim, bias=bias_kv)
                 self.kv_projection = None
 
-        self.output_projection = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.output_projection = Linear(embed_dim, embed_dim, bias=bias)
         self._reset_parameters()  # reset parameters for nn.Linear layers as in original article
 
     def _reset_parameters(self) -> None:
@@ -179,36 +181,36 @@ class MultiHeadAttention(nn.Module):
         :return: None
         """
         # initializes Wo weights matrix for output projection 
-        nn.init.xavier_uniform_(self.output_projection.weight)
+        xavier_uniform_(self.output_projection.weight)
         if self.bias:
             self.output_projection.bias.data.fill_(0.)
 
         # initializes Wqkv weights matrix only for self-attention forward
         if self.qkv_projection is not None:
-            nn.init.xavier_uniform_(self.qkv_projection.weight)
+            xavier_uniform_(self.qkv_projection.weight)
             if self.bias:
                 self.qkv_projection.bias.data.fill_(0.)
         else:
-            nn.init.xavier_uniform_(self.queries_projection.weight)
+            xavier_uniform_(self.queries_projection.weight)
             if self.bias:
                 self.queries_projection.bias.data.fill_(0.)
 
             # initializes Wkv weights matrix only for cross-attention forward
             if self.kv_projection is not None:
-                nn.init.xavier_uniform_(self.kv_projection.weight)
+                xavier_uniform_(self.kv_projection.weight)
                 if self.bias_kv:
                     self.kv_projection.bias.data.fill_(0.)
 
             # initializes Wq, Wk and Wv weights matrices for any forward 
             else:
-                nn.init.xavier_uniform_(self.keys_projection.weight)
-                nn.init.xavier_uniform_(self.values_projection.weight)
+                xavier_uniform_(self.keys_projection.weight)
+                xavier_uniform_(self.values_projection.weight)
                 if self.bias_kv:
                     self.keys_projection.bias.data.fill_(0.)
                     self.values_projection.bias.data.fill_(0.)
 
     @staticmethod
-    def expand_mask(mask: torch.Tensor) -> torch.Tensor:
+    def expand_mask(mask: Tensor) -> Tensor:
         r"""
         This method expand (broadcast) the mask to support different mask shapes.
         Mask tensor for masking attention scores. 
@@ -233,10 +235,10 @@ class MultiHeadAttention(nn.Module):
         return mask
 
     def __compute_attention_scores(self,
-                                   queries: torch.Tensor,
-                                   keys: torch.Tensor,
-                                   mask: Optional[torch.Tensor] = None
-                                   ) -> torch.Tensor:
+                                   queries: Tensor,
+                                   keys: Tensor,
+                                   mask: Optional[Tensor] = None
+                                   ) -> Tensor:
         r"""
         Computes attention scores as scaled dot product between queries and keys tensors, using
         an optional attention mask if passed, and applying dropout if a probability
@@ -271,11 +273,11 @@ class MultiHeadAttention(nn.Module):
         return self.dropout(attention_scores)  # applying dropout to attention scores
 
     def _scaled_dot_product_attention(self,
-                                      queries: torch.Tensor,
-                                      keys: torch.Tensor,
-                                      values: torch.Tensor,
-                                      mask: torch.Tensor
-                                      ) -> torch.Tensor:
+                                      queries: Tensor,
+                                      keys: Tensor,
+                                      values: Tensor,
+                                      mask: Tensor
+                                      ) -> Tensor:
         r"""
         Computes scaled dot product attention on query, key and value tensors, using
         an optional attention mask if passed, and applying dropout if a probability
@@ -303,8 +305,7 @@ class MultiHeadAttention(nn.Module):
         attend = attention_scores @ values  # applying attention scores to values
         return attend, attention_scores
 
-    def _separate_projections(self, linear_projection: torch.Tensor) -> torch.Tensor | tuple[
-        torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _separate_projections(self, linear_projection: Tensor) -> Tensor | tuple[Tensor, Tensor, Tensor]:
         r"""
         Separate (reshape) input linear projection of Q, K and V into heads 
         and split into chunks: 
@@ -374,10 +375,10 @@ class MultiHeadAttention(nn.Module):
         return linear_projection.chunk(3, dim=-1)  # Q, K, V linear projections
 
     def _in_projection(self,
-                       queries: torch.Tensor,
-                       keys: torch.Tensor,
-                       values: torch.Tensor,
-                       ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+                       queries: Tensor,
+                       keys: Tensor,
+                       values: Tensor,
+                       ) -> tuple[Tensor, Tensor, Tensor]:
         """
         Do linear projection of Q, K and V for all heads into subspaces 
         using three separated weights matrices (nn.Linear layers) Wq, Wk and Wv for queries, keys and values projections.
@@ -412,7 +413,7 @@ class MultiHeadAttention(nn.Module):
         values = self._separate_projections(values)
         return queries, keys, values
 
-    def _self_in_projection(self, qkv: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _self_in_projection(self, qkv: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """
         Do linear projection of queries, keys, and values for all heads, 
         where queries, keys and values it the same tensor.
@@ -436,8 +437,7 @@ class MultiHeadAttention(nn.Module):
         #   [batch_size, num_heads, sequence_length, head_dim]
         return self._separate_projections(qkv)  # queries, keys, values  
 
-    def _cross_in_projection(self, queries: torch.Tensor, kv: torch.Tensor) -> tuple[
-        torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _cross_in_projection(self, queries: Tensor, kv: Tensor) -> tuple[Tensor, Tensor, Tensor]:
         """
         Do linear projection of queries, keys, and values for all heads, 
         where keys and values it the same tensor.
@@ -460,9 +460,9 @@ class MultiHeadAttention(nn.Module):
 
     @staticmethod
     def __check_qkv_shapes(
-            queries: torch.Tensor,
-            keys: torch.Tensor,
-            values: torch.Tensor
+            queries: Tensor,
+            keys: Tensor,
+            values: Tensor
     ) -> None:
         # check shapes sanity         
         assert queries.ndim == keys.ndim == values.ndim, (
@@ -479,12 +479,12 @@ class MultiHeadAttention(nn.Module):
         )
 
     def forward(self,
-                queries: torch.Tensor,
-                keys: torch.Tensor,
-                values: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                queries: Tensor,
+                keys: Tensor,
+                values: Tensor,
+                mask: Optional[Tensor] = None,
                 return_attention_probs: Optional[bool] = False
-                ) -> torch.Tensor:
+                ) -> Tensor:
         r"""
         Forward pass of the multi-head attention mechanism:
 
@@ -536,14 +536,16 @@ class MultiHeadAttention(nn.Module):
             queries, keys, values = self._in_projection(queries, keys, values)  # any attention forward
 
         # shapes for Q, K, V at this stage: [batch_size, num_heads, sequence_length, head_dim] 
-        attend, attention_scores = self._scaled_dot_product_attention(queries, keys, values,
-                                                                      mask)  # computing dot product attention
+        attend, attention_scores = self._scaled_dot_product_attention(
+            queries, keys, values, mask
+        )  # computing dot product attention
 
         # attend have shape [batch_size, num_heads, sequence_length, head_dim]
         # attention_scores have shape [batch_size, num_heads, sequence_length, sequence_length]
         attend = attend.permute(0, 2, 1, 3)  # [batch_size, sequence_length, num_heads, head_dim]
-        attend = attend.reshape(attend.size(0), attend.size(1),
-                                self.embed_dim)  # [batch_size, sequence_length, num_heads * head_dim]
+        attend = attend.reshape(
+            attend.size(0), attend.size(1), self.embed_dim
+        )  # [batch_size, sequence_length, num_heads * head_dim]
         # and make output linear projection for adding up results of all heads in one space representation 
         attend = self.output_projection(attend)  # [batch_size, sequence_length, embed_dim]
 
