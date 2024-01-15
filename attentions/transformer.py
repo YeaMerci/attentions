@@ -167,6 +167,50 @@ class TransformerDecoder(nn.Module):
 
 
 class Transformer(nn.Module):
+    """
+    Transformer model composed of a TransformerEncoder and a TransformerDecoder.
+
+    Args:
+        d_model (Optional[int]): Dimensionality of the input features. Defaults to 512.
+        num_heads (Optional[int]): Number of attention heads in the multi-head attention blocks. Defaults to 8.
+        num_encoder_layers (Optional[int]): Number of layers in the encoder. Defaults to 6.
+        num_decoder_layers (Optional[int]): Number of layers in the decoder. Defaults to 6.
+        dim_feedforward (Optional[int]): Dimensionality of the intermediate representations in the feedforward blocks.
+            Defaults to 2048.
+        dropout (Optional[float]): Dropout probability applied to the attention scores and feedforward blocks.
+            Defaults to 0.1.
+        activation (Union[str, Callable[[Tensor], Tensor]]): Activation function applied to the intermediate representations
+            in the feedforward blocks. It can be a string indicating the name of a torch activation function
+            (e.g., 'relu') or a callable function. Defaults to nn.ReLU.
+        custom_encoder (Optional[Any]): Custom encoder module. If provided, this module will be used as the encoder.
+            Defaults to None.
+        custom_decoder (Optional[Any]): Custom decoder module. If provided, this module will be used as the decoder.
+            Defaults to None.
+        pre_layer_norm (Optional[bool]): If True, apply layer normalization before each sub-block
+            (self-attention and feedforward) in both encoder and decoder. Defaults to False.
+        layer_norm_eps (Optional[float]): Epsilon value for layer normalization. Defaults to 1e-5.
+        bias (Optional[bool]): If True, enable bias in linear transformations. Defaults to True.
+
+    Attributes:
+        encoder (TransformerEncoder): TransformerEncoder instance.
+        decoder (TransformerDecoder): TransformerDecoder instance.
+
+    Shape conventions:
+        - Input:
+            - source: (batch_size, source_sequence_length, d_model)
+            - target: (batch_size, target_sequence_length, d_model)
+            - source_mask: (batch_size, 1, source_sequence_length)
+            - target_mask: (batch_size, 1, target_sequence_length)
+            - memory_mask: (batch_size, 1, source_sequence_length)
+        - Output: (batch_size, target_sequence_length, d_model)
+
+    Example:
+        >>> transformer_model = Transformer(d_model=512, num_heads=8, num_encoder_layers=6, num_decoder_layers=6)
+        >>> source_data = torch.randn((32, 20, 512))  # Batch size of 32, source sequence length of 20
+        >>> target_data = torch.randn((32, 15, 512))  # Batch size of 32, target sequence length of 15
+        >>> output_data = transformer_model(source_data, target_data)
+    """
+
     def __init__(self,
                  d_model: Optional[int] = 512,
                  num_heads: Optional[int] = 8,
@@ -181,6 +225,8 @@ class Transformer(nn.Module):
                  layer_norm_eps: Optional[float] = 1e-5,
                  bias: Optional[bool] = True,
                  ):
+
+        super().__init__()
 
         # build encoder and decoder
         # create custom encoder if it was provided
@@ -215,7 +261,6 @@ class Transformer(nn.Module):
 
     def _reset_parameters(self):
         r"""Initiate parameters in the transformer model."""
-
         for p in self.parameters():
             if p.dim() > 1:
                 xavier_uniform_(p)
@@ -226,7 +271,26 @@ class Transformer(nn.Module):
                 source_mask: Optional[Tensor] = None,
                 target_mask: Optional[Tensor] = None,
                 memory_mask: Optional[Tensor] = None
-                ):
+                ) -> Tensor:
+        """
+        Forward pass of the Transformer model.
+
+        Args:
+            source (Tensor): Input tensor (source sequence) of shape (batch_size, source_sequence_length, d_model).
+            target (Tensor): Input tensor (target sequence) of shape (batch_size, target_sequence_length, d_model).
+            source_mask (Optional[Tensor]): Mask tensor for masking attention scores on the source sequence.
+                It should be of shape (batch_size, 1, source_sequence_length) and contain 0s in positions
+                where attention should be masked.
+            target_mask (Optional[Tensor]): Mask tensor for masking attention scores on the target sequence.
+                It should be of shape (batch_size, 1, target_sequence_length) and contain 0s in positions
+                where attention should be masked.
+            memory_mask (Optional[Tensor]): Mask tensor for masking attention scores on the memory.
+                It should be of shape (batch_size, 1, source_sequence_length) and contain 0s in positions
+                where attention should be masked.
+
+        Returns:
+            Tensor: Output tensor of shape (batch_size, target_sequence_length, d_model).
+        """
         memory = self.encoder(source, source_mask)
         output = self.decoder(target, memory, target_mask, memory_mask)
         return output
